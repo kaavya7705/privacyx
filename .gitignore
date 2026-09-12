@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+
+# production
+build/
+dist/
+
+# env files
+.env
+.env.local
+.env.production.local
+
+# debug
+npm-debug.log*
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.pem
+
+# python
+__pycache__/
+*.pyc
+.venv/
+ml-service/.venv/
+
+# IDE
+.vscode/
+.idea/
