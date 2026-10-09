@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Shield, LayoutDashboard, Radio, Target, Brain, GitBranch,
-  ShieldCheck, GitCompare, FlaskConical, Clock, Settings,
+  ShieldCheck, ShieldAlert, GitCompare, FlaskConical, Clock, Settings,
   Lock, LogOut, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/inferences", icon: Brain, label: "Inferences" },
   { href: "/graph", icon: GitBranch, label: "Evidence Graph" },
   { href: "/defense", icon: ShieldCheck, label: "Defense" },
+  { href: "/leaks", icon: ShieldAlert, label: "Data Leaks" },
   { href: "/regression", icon: GitCompare, label: "Regression" },
   { href: "/experiments", icon: FlaskConical, label: "Experiments" },
   { href: "/history", icon: Clock, label: "History" },

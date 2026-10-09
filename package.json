@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ml:train": "python ml-service/train.py",
+    "ml:start": "python -m uvicorn --app-dir ml-service main:app --reload --port 8000",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down"
   },
   "dependencies": {
     "@xyflow/react": "^12.6.0",

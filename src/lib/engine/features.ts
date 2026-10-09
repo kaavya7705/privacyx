@@ -79,11 +79,15 @@ export function extractFeatures(events: IEvent[]): ExtractedFeatures {
   const behavioral = extractBehavioralFeatures(events, temporal);
   const crossSource = extractCrossSourceFeatures(events);
 
-  const dates = events.map((e) => new Date(e.createdAt));
-  const dateRange = {
-    start: new Date(Math.min(...dates.map((d) => d.getTime()))),
-    end: new Date(Math.max(...dates.map((d) => d.getTime()))),
-  };
+  const dates = events
+    .map((e) => new Date(e.createdAt))
+    .filter((d) => !isNaN(d.getTime()));
+  const dateRange = dates.length > 0
+    ? {
+        start: new Date(Math.min(...dates.map((d) => d.getTime()))),
+        end: new Date(Math.max(...dates.map((d) => d.getTime()))),
+      }
+    : { start: new Date(), end: new Date() };
 
   return {
     temporal,
@@ -216,11 +220,12 @@ function extractUniquenessFeatures(
   const rareThreshold = events.length * 0.02;
   const rareEventCount = categoryValues.filter((v) => v < rareThreshold).length;
 
-  // Overall uniqueness score
+  // Overall uniqueness score — scaled by sample size confidence (requires >= 10 events for full certainty)
+  const sampleConfidence = Math.min(1, Math.max(0.2, events.length / 10));
   const behaviorUniqueness = (categoryUniqueness + temporalUniqueness) / 2;
   const overallUniqueness = Math.min(
     1,
-    (categoryUniqueness * 0.3 + temporalUniqueness * 0.3 + behaviorUniqueness * 0.4)
+    (categoryUniqueness * 0.3 + temporalUniqueness * 0.3 + behaviorUniqueness * 0.4) * sampleConfidence
   );
 
   return {
@@ -335,7 +340,10 @@ function shannonEntropy(probabilities: number[]): number {
 function groupEventsByDay(events: IEvent[]): Record<string, IEvent[]> {
   const groups: Record<string, IEvent[]> = {};
   for (const event of events) {
-    const date = new Date(event.createdAt).toISOString().split("T")[0];
+    const d = new Date(event.createdAt);
+    // Skip events with missing/invalid dates (e.g., synthetic noise events from defenses)
+    if (isNaN(d.getTime())) continue;
+    const date = d.toISOString().split("T")[0];
     if (!groups[date]) groups[date] = [];
     groups[date].push(event);
   }

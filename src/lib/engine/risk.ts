@@ -1,8 +1,12 @@
 /**
- * Risk Engine — computes quantitative privacy risk from attack results
+ * Risk Engine v2.0 — computes quantitative privacy risk from attack results + ML predictions
  * 
  * Risk = w1×EvidenceStrength + w2×Uniqueness + w3×TemporalConsistency
- *      + w4×CrossSourceSupport + w5×AdversaryPrior - w6×ContradictionPenalty
+ *      + w4×CrossSourceSupport + w5×AdversaryPrior + w6×MLRiskAdjustment
+ *      - w7×ContradictionPenalty
+ *
+ * NEW: When ML service is online, blends ML-based risk scores with heuristic analysis
+ * for a more accurate and impactful risk assessment.
  */
 
 import type { ExtractedFeatures } from "@/lib/engine/features";
@@ -15,6 +19,7 @@ export interface RiskComponents {
   temporalConsistency: number;
   crossSourceSupport: number;
   adversaryPrior: number;
+  mlRiskAdjustment: number;
   contradictionPenalty: number;
 }
 
@@ -27,21 +32,44 @@ export interface RiskScore {
   reidentification: number;
   components: RiskComponents;
   attackProfile: AdversaryProfile;
+  mlEnhanced: boolean;
+}
+
+export interface MLRiskInput {
+  risk_score: number;
+  method: string;
+  components: Record<string, number>;
 }
 
 const WEIGHTS = {
+  evidenceStrength: 0.22,
+  uniqueness: 0.18,
+  temporalConsistency: 0.12,
+  crossSourceSupport: 0.12,
+  adversaryPrior: 0.12,
+  mlRiskAdjustment: 0.14, // NEW: ML component weight
+  contradictionPenalty: 0.10,
+};
+
+// Weights when ML is NOT available (fallback)
+const WEIGHTS_NO_ML = {
   evidenceStrength: 0.25,
   uniqueness: 0.2,
   temporalConsistency: 0.15,
   crossSourceSupport: 0.15,
   adversaryPrior: 0.15,
+  mlRiskAdjustment: 0,
   contradictionPenalty: 0.1,
 };
 
 export function computeRisk(
   features: ExtractedFeatures,
-  attackResults: AttackBatteryResult
+  attackResults: AttackBatteryResult,
+  mlRiskInput?: MLRiskInput | null
 ): RiskScore {
+  const mlAvailable = mlRiskInput != null && mlRiskInput.method !== "heuristic_fallback";
+  const w = mlAvailable ? WEIGHTS : WEIGHTS_NO_ML;
+
   // Evidence strength: average confidence across attacks
   const evidenceStrength =
     attackResults.attacks.reduce((sum, a) => sum + a.confidence, 0) /
@@ -65,17 +93,25 @@ export function computeRisk(
   };
   const adversaryPrior = adversaryPriorMap[attackResults.adversaryProfile];
 
+  // ML Risk Adjustment — blended from ML ensemble prediction
+  let mlRiskAdjustment = 0;
+  if (mlAvailable && mlRiskInput) {
+    // ML risk_score is 0-100, normalize to 0-1
+    mlRiskAdjustment = mlRiskInput.risk_score / 100;
+  }
+
   // Contradiction penalty: if attacks contradict each other
   const contradictionPenalty = computeContradictionPenalty(attackResults);
 
   // Compute weighted risk
   const rawRisk =
-    WEIGHTS.evidenceStrength * evidenceStrength +
-    WEIGHTS.uniqueness * uniqueness +
-    WEIGHTS.temporalConsistency * temporalConsistency +
-    WEIGHTS.crossSourceSupport * crossSourceSupport +
-    WEIGHTS.adversaryPrior * adversaryPrior -
-    WEIGHTS.contradictionPenalty * contradictionPenalty;
+    w.evidenceStrength * evidenceStrength +
+    w.uniqueness * uniqueness +
+    w.temporalConsistency * temporalConsistency +
+    w.crossSourceSupport * crossSourceSupport +
+    w.adversaryPrior * adversaryPrior +
+    w.mlRiskAdjustment * mlRiskAdjustment -
+    w.contradictionPenalty * contradictionPenalty;
 
   const normalizedRisk = Math.round(Math.max(0, Math.min(100, rawRisk * 100)));
 
@@ -92,9 +128,11 @@ export function computeRisk(
       temporalConsistency: Math.round(temporalConsistency * 100),
       crossSourceSupport: Math.round(crossSourceSupport * 100),
       adversaryPrior: Math.round(adversaryPrior * 100),
+      mlRiskAdjustment: Math.round(mlRiskAdjustment * 100),
       contradictionPenalty: Math.round(contradictionPenalty * 100),
     },
     attackProfile: attackResults.adversaryProfile,
+    mlEnhanced: mlAvailable,
   };
 }
 

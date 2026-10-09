@@ -1,0 +1,27 @@
+{
+  "trained_at": "2026-09-15T12:18:08.056547Z",
+  "n_samples": 600,
+  "n_features": 5,
+  "models": {
+    "anomaly_detector": {
+      "precision": 0.9167,
+      "recall": 0.9167,
+      "f1": 0.9167,
+      "anomaly_rate": 0.12,
+      "mean_decision_score": 0.0885633651718669
+    },
+    "autoencoder": {
+      "threshold": 2.0857,
+      "mean_reconstruction_error": 0.8516
+    },
+    "risk_classifier": {
+      "cv_f1_mean": 1.0,
+      "f1": 1.0,
+      "roc_auc": 1.0
+    },
+    "routine_clusterer": {
+      "n_clusters": 5,
+      "silhouette_score": 0.1928
+    }
+  }
+}

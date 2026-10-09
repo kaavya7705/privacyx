@@ -3,78 +3,308 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PrivacyX Monitor</title>
+  <title>PrivacyX Shield & Leak Prevention</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 320px; background: #0a0e1a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .header { display: flex; align-items: center; gap: 8px; padding: 16px; border-bottom: 1px solid #243056; }
-    .header svg { width: 24px; height: 24px; color: #00f0ff; }
-    .header h1 { font-size: 16px; font-weight: 700; }
+    body {
+      width: 340px;
+      background: #080d1a;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #111a33 0%, #0c1326 100%);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header svg {
+      width: 24px;
+      height: 24px;
+      color: #00f0ff;
+      filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5));
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
     .header h1 span { color: #00f0ff; }
-    .status { padding: 16px; display: flex; align-items: center; gap: 8px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .status-dot.active { background: #00ff88; box-shadow: 0 0 10px rgba(0,255,136,0.5); animation: pulse 2s ease-in-out infinite; }
+    .badge-mode {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(0, 255, 136, 0.15);
+      color: #00ff88;
+      border: 1px solid rgba(0, 255, 136, 0.3);
+    }
+    .badge-mode.monitor {
+      background: rgba(255, 184, 0, 0.15);
+      color: #ffb800;
+      border-color: rgba(255, 184, 0, 0.3);
+    }
+
+    .status-bar {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0b1122;
+      border-bottom: 1px solid #1a2342;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.active {
+      background: #00ff88;
+      box-shadow: 0 0 12px #00ff88;
+      animation: pulse 2s ease-in-out infinite;
+    }
     .status-dot.paused { background: #ffb800; }
-    .status-dot.disconnected { background: #ff006e; }
-    .status-text { font-size: 12px; color: #94a3b8; }
-    .stats { padding: 0 16px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat { background: #1a2342; border: 1px solid #243056; border-radius: 8px; padding: 12px; }
-    .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; }
-    .stat-value { font-size: 20px; font-weight: 700; color: #00f0ff; margin-top: 4px; }
-    .controls { padding: 0 16px 16px; }
-    .btn { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; }
-    .btn-pause { background: rgba(255,184,0,0.1); border-color: rgba(255,184,0,0.3); color: #ffb800; margin-bottom: 8px; }
-    .btn-pause:hover { background: rgba(255,184,0,0.2); }
-    .btn-resume { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3); color: #00ff88; margin-bottom: 8px; }
-    .btn-sync { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3); color: #00ff88; margin-bottom: 8px; }
-    .btn-sync:hover { background: rgba(0,255,136,0.2); }
-    .btn-dashboard { background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.3); color: #00f0ff; }
-    .btn-dashboard:hover { background: rgba(0,240,255,0.2); }
-    .token-section { padding: 0 16px 16px; }
-    .token-input { width: 100%; padding: 8px 12px; background: #0f1629; border: 1px solid #243056; border-radius: 6px; color: #e2e8f0; font-size: 11px; }
-    .token-input:focus { outline: none; border-color: rgba(0,240,255,0.5); }
-    .token-label { font-size: 10px; color: #64748b; margin-bottom: 4px; display: block; }
-    .footer { padding: 12px 16px; border-top: 1px solid #243056; font-size: 10px; color: #64748b; text-align: center; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .status-dot.disconnected { background: #ff0055; box-shadow: 0 0 10px rgba(255,0,85,0.5); }
+    .status-text {
+      font-size: 12px;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Mode selector */
+    .shield-toggle-box {
+      padding: 12px 16px;
+      background: #0d152b;
+      border-bottom: 1px solid #1a2342;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .shield-info-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .shield-info-desc {
+      font-size: 10px;
+      color: #64748b;
+    }
+    .switch-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: rgba(0, 240, 255, 0.1);
+      color: #00f0ff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .switch-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .stat-card {
+      background: #111a33;
+      border: 1px solid #1f2b4d;
+      border-radius: 8px;
+      padding: 10px 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 3px; height: 100%;
+      background: #00f0ff;
+    }
+    .stat-card.danger::before { background: #ff0055; }
+    .stat-card.warning::before { background: #ffb800; }
+    .stat-card.success::before { background: #00ff88; }
+    .stat-label {
+      font-size: 9px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+    .stat-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+
+    /* Controls */
+    .controls {
+      padding: 4px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-sync {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 119, 255, 0.15));
+      border-color: rgba(0, 240, 255, 0.4);
+      color: #00f0ff;
+    }
+    .btn-sync:hover {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(0, 119, 255, 0.3));
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+    }
+    .btn-pause {
+      background: rgba(255, 184, 0, 0.1);
+      border-color: rgba(255, 184, 0, 0.3);
+      color: #ffb800;
+    }
+    .btn-pause:hover { background: rgba(255, 184, 0, 0.2); }
+    .btn-resume {
+      background: rgba(0, 255, 136, 0.1);
+      border-color: rgba(0, 255, 136, 0.3);
+      color: #00ff88;
+    }
+    .btn-resume:hover { background: rgba(0, 255, 136, 0.2); }
+    .btn-dashboard {
+      background: #152243;
+      border-color: #243463;
+      color: #94a3b8;
+    }
+    .btn-dashboard:hover {
+      background: #1c2e5c;
+      color: #f1f5f9;
+    }
+
+    /* Token input */
+    .token-box {
+      padding: 0 16px 14px;
+    }
+    .token-label {
+      font-size: 10px;
+      color: #64748b;
+      margin-bottom: 4px;
+      display: block;
+      font-weight: 600;
+    }
+    .token-input {
+      width: 100%;
+      padding: 8px 10px;
+      background: #090f20;
+      border: 1px solid #1f2b4d;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 11px;
+    }
+    .token-input:focus {
+      outline: none;
+      border-color: #00f0ff;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+    }
+
+    .footer {
+      padding: 10px 16px;
+      border-top: 1px solid #17213d;
+      font-size: 9px;
+      color: #64748b;
+      text-align: center;
+      background: #080d1a;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.92); }
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    </svg>
-    <h1>Privacy<span>X</span> Monitor</h1>
-  </div>
-
-  <div class="status">
-    <div class="status-dot" id="statusDot"></div>
-    <span class="status-text" id="statusText">Initializing...</span>
-  </div>
-
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-label">Events Queued</div>
-      <div class="stat-value" id="queueCount">0</div>
+    <div class="header-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <h1>Privacy<span>X</span> Shield</h1>
     </div>
-    <div class="stat">
-      <div class="stat-label">Total Sent</div>
-      <div class="stat-value" id="totalCount">0</div>
+    <span class="badge-mode" id="modeBadge">ACTIVE</span>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Initializing Shield...</span>
+  </div>
+
+  <div class="shield-toggle-box">
+    <div>
+      <div class="shield-info-title">Leak Defense Mode</div>
+      <div class="shield-info-desc" id="modeDesc">Active: Auto-blocking trackers & brokers</div>
+    </div>
+    <button class="switch-btn" id="toggleModeBtn">Switch</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card danger">
+      <div class="stat-label">PII Leaks Prevented</div>
+      <div class="stat-val" id="piiCount">0</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-label">Trackers Blocked</div>
+      <div class="stat-val" id="trackersCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Events Queued</div>
+      <div class="stat-val" id="queueCount">0</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">Total Synced</div>
+      <div class="stat-val" id="totalCount">0</div>
     </div>
   </div>
 
   <div class="controls">
     <button class="btn btn-sync" id="syncBtn">⚡ Sync Events Now</button>
-    <button class="btn btn-pause" id="toggleBtn">⏸ Pause Monitoring</button>
-    <button class="btn btn-dashboard" id="dashboardBtn">Open Dashboard</button>
+    <button class="btn btn-pause" id="toggleBtn">⏸ Pause Protection</button>
+    <button class="btn btn-dashboard" id="dashboardBtn">📊 Open PrivacyX Dashboard</button>
   </div>
 
-  <div class="token-section">
-    <label class="token-label">API Token</label>
+  <div class="token-box">
+    <label class="token-label">API Token / Session</label>
     <input type="password" class="token-input" id="tokenInput" placeholder="Paste your API token here" />
   </div>
 
   <div class="footer">
-    PrivacyX does not collect passwords, keystrokes, or private content.
+    PrivacyX Engine v2.0 • Real-time PII & Tracker Interception
   </div>
 
   <script src="popup.js"></script>

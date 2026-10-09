@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7-jammy
+    container_name: privacyx-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: privacyx
+    networks:
+      - privacyx-network
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: privacyx-ml-service
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml-service/models:/app/models
+    environment:
+      - PORT=8000
+    networks:
+      - privacyx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: privacyx-web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+      - ml-service
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/privacyx
+      - NEXT_PUBLIC_ML_SERVICE_URL=http://ml-service:8000
+      - ML_SERVICE_URL=http://ml-service:8000
+      - JWT_SECRET=privacyx-production-secret-replace-with-custom-key
+    networks:
+      - privacyx-network
+
+networks:
+  privacyx-network:
+    driver: bridge
+
+volumes:
+  mongo_data:

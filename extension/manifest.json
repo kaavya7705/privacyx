@@ -1,19 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "PrivacyX Monitor",
-  "version": "1.0.0",
-  "description": "Privacy-first metadata collector for PrivacyX — AI-assisted personal data penetration testing platform",
+  "name": "PrivacyX Shield",
+  "version": "2.0.0",
+  "description": "AI-powered privacy protection — real-time PII detection, tracker blocking, data leak prevention, and privacy risk analysis",
   "permissions": [
     "tabs",
     "storage",
-    "alarms"
+    "alarms",
+    "notifications",
+    "webRequest",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

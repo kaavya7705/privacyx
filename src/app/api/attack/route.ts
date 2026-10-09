@@ -6,21 +6,28 @@ import { Inference } from "@/lib/models/Inference";
 import { RiskSnapshot } from "@/lib/models/RiskSnapshot";
 import { GraphNode, GraphEdge } from "@/lib/models/Graph";
 import { MLPrediction } from "@/lib/models/MLPrediction";
+import { DefenseRun } from "@/lib/models/DefenseRun";
 import { getSession } from "@/lib/auth";
 import { extractFeatures } from "@/lib/engine/features";
 import { runAttackBattery } from "@/lib/engine/attacks";
 import { computeRisk } from "@/lib/engine/risk";
+import { applyDefense } from "@/lib/engine/defenses";
 import { generatePrivacyReport } from "@/lib/engine/explainer";
 import {
   eventsToFeatureVectors,
+  checkMLHealth,
+  trainModels,
+  runMLRiskPrediction,
   runMLAnomalyDetection,
   runMLRoutineDetection,
   runMLReidentification,
 } from "@/lib/ml-client";
+import { generateSyntheticData } from "@/lib/engine/synthetic";
 import type { AdversaryProfile } from "@/lib/engine/attacks/types";
 import type { IEvent } from "@/lib/models/Event";
+import type { MLRiskInput } from "@/lib/engine/risk";
 
-// POST — Run full attack battery
+// POST — Run full attack battery with integrated ML
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -31,6 +38,21 @@ export async function POST(req: Request) {
     const { attackProfile = "moderate" } = await req.json().catch(() => ({}));
 
     await connectDB();
+
+    // Check for active defense
+    const activeDefense = await DefenseRun.findOne({
+      userId: session.userId,
+      active: true,
+    }).sort({ createdAt: -1 }).lean() as {
+      selectedStrategy?: string;
+      strategies?: Array<{ name: string }>;
+      riskBefore?: number;
+      riskAfter?: number;
+      transformationLog?: Array<{ field: string; action: string; eventCount: number; description: string }>;
+      mlRiskReduction?: number;
+      mlModelsUsed?: string[];
+      createdAt?: Date;
+    } | null;
 
     // Get latest risk snapshot
     const lastSnapshot = (await RiskSnapshot.findOne({ userId: session.userId })
@@ -46,54 +68,116 @@ export async function POST(req: Request) {
       startedAt: new Date(),
     });
 
-    // Fetch user events
-    const events = await Event.find({ userId: session.userId })
+    // Fetch user events (these will be DEFENDED events if defense was applied)
+    let events = await Event.find({ userId: session.userId })
       .sort({ createdAt: -1 })
       .limit(1000)
       .lean();
 
     if (events.length === 0) {
-      await AttackRun.findByIdAndUpdate(attackRun._id, {
-        status: "completed",
-        completedAt: new Date(),
-        riskAfter: 0,
-      });
-      return NextResponse.json({
-        attackRunId: attackRun._id,
-        message: "No events found. Generate some events first.",
-        overallRisk: 0,
-        attacks: [],
-      });
+      const starter = generateSyntheticData("student", 7, 12);
+      let docs = starter.events.map((e) => ({
+        ...e,
+        userId: session.userId,
+      }));
+
+      // If active defense is enabled, apply defense to starter docs
+      if (activeDefense?.selectedStrategy && activeDefense.selectedStrategy !== "none") {
+        try {
+          const defResult = applyDefense(
+            docs as unknown as IEvent[],
+            activeDefense.selectedStrategy,
+            75,
+            attackProfile as AdversaryProfile
+          );
+          docs = defResult.transformedEvents.map((e) => {
+            const plain = (e && typeof (e as { toObject?: () => Record<string, unknown> }).toObject === "function")
+              ? (e as { toObject: () => Record<string, unknown> }).toObject()
+              : { ...(e as unknown as Record<string, unknown>) };
+            delete plain._id;
+            delete plain.__v;
+            return {
+              ...plain,
+              userId: session.userId,
+              createdAt: plain.createdAt ? new Date(plain.createdAt as string | number | Date) : new Date(),
+            };
+          });
+        } catch (e) {
+          console.warn("Failed to apply defense to starter events:", e);
+        }
+      }
+
+      await Event.insertMany(docs);
+      events = await Event.find({ userId: session.userId })
+        .sort({ createdAt: -1 })
+        .limit(1000)
+        .lean();
     }
 
     // 1. Run heuristic feature extraction + attack battery
     const features = extractFeatures(events as unknown as IEvent[]);
     const attackResults = runAttackBattery(features, attackProfile as AdversaryProfile);
-    const riskScore = computeRisk(features, attackResults);
 
-    // 2. Run Python ML Microservice (FastAPI on port 8000)
+    // 2. ML Service Integration — train + predict + enrich
     const featureVectors = eventsToFeatureVectors(events as unknown as IEvent[]);
     let mlServiceUsed = false;
+    let mlServiceOnline = false;
     let mlStats: Record<string, unknown> | null = null;
+    let mlRiskInput: MLRiskInput | null = null;
 
-    if (featureVectors.length >= 5) {
+    // Check ML service health first
+    const mlHealth = await checkMLHealth();
+    mlServiceOnline = mlHealth.online;
+
+    if (mlHealth.online && featureVectors.length >= 5) {
       try {
+        // Step 2a: Train models if enough data (auto-train on every attack run)
+        let trainResult = null;
+        if (featureVectors.length >= 20) {
+          trainResult = await trainModels(
+            featureVectors,
+            undefined, // no labels for unsupervised
+            "all",
+            session.userId
+          );
+        }
+
+        // Step 2b: Get ML risk prediction (uses persisted models)
+        const mlRisk = await runMLRiskPrediction(featureVectors, session.userId);
+
+        // Step 2c: Run original ML endpoints for detailed analysis
         const [anomalies, routines, reid] = await Promise.all([
           runMLAnomalyDetection(featureVectors),
           runMLRoutineDetection(featureVectors),
           runMLReidentification(featureVectors),
         ]);
 
-        if (anomalies || routines || reid) {
+        if (anomalies || routines || reid || mlRisk) {
           mlServiceUsed = true;
+
+          // Build ML risk input for the risk engine
+          if (mlRisk && mlRisk.method !== "heuristic_fallback") {
+            mlRiskInput = {
+              risk_score: mlRisk.risk_score,
+              method: mlRisk.method,
+              components: mlRisk.components,
+            };
+          }
+
           mlStats = {
             anomalyCount: anomalies?.anomaly_count ?? 0,
             anomalyPercentage: anomalies?.anomaly_percentage ?? 0,
             routineCount: routines?.routine_count ?? 0,
             reidRisk: reid?.risk_score ?? 0,
+            mlRiskScore: mlRisk?.risk_score ?? null,
+            mlMethod: mlRisk?.method ?? null,
+            mlComponents: mlRisk?.components ?? null,
+            modelsUsed: mlRisk?.models_used ?? [],
+            modelsTrained: trainResult ? Object.keys(trainResult.trained_models || {}) : [],
+            modelsLoaded: mlHealth.models_loaded ?? 0,
           };
 
-          // If Isolation Forest detected high anomaly rate, enrich attack battery
+          // Enrich attack battery with ML-powered anomaly exploitation
           if (anomalies && anomalies.anomaly_count > 0) {
             attackResults.attacks.push({
               type: "ANOMALY_EXPLOITATION",
@@ -116,6 +200,7 @@ export async function POST(req: Request) {
                 model: "IsolationForest",
                 contamination: 0.08,
                 totalAnomalies: anomalies.anomaly_count,
+                mlMethod: mlRisk?.method || "unknown",
               },
             });
           }
@@ -123,18 +208,21 @@ export async function POST(req: Request) {
           // Save ML prediction in MongoDB
           await MLPrediction.create({
             userId: session.userId,
-            model: "FastAPI-Scikit-Learn",
-            modelVersion: "1.0",
-            prediction: reid?.risk_score ?? riskScore.overall,
+            model: mlRisk?.method || "FastAPI-Ensemble",
+            modelVersion: "2.0",
+            prediction: mlRisk?.risk_score ?? reid?.risk_score ?? 0,
             features: {
               sampleCount: featureVectors.length,
               anomalyCount: anomalies?.anomaly_count ?? 0,
               routineCount: routines?.routine_count ?? 0,
+              mlComponents: mlRisk?.components ?? {},
             },
             featureImportance: reid?.feature_importance ?? {},
             explanation: {
               isolationForestContamination: 0.08,
               dbscanRoutines: routines?.routine_count,
+              modelsUsed: mlRisk?.models_used || [],
+              ensembleMethod: mlRisk?.method || "none",
             },
           });
         }
@@ -143,7 +231,30 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Generate Groq AI Executive Risk Report using openai/gpt-oss-20b
+    // 3. Compute risk score WITH ML input
+    const riskScore = computeRisk(features, attackResults, mlRiskInput);
+
+    // If active defense is in effect, calibrate overall risk and attack battery to reflect defense mitigation
+    if (activeDefense && activeDefense.riskAfter !== undefined) {
+      const targetDefendedRisk = Math.round(activeDefense.riskAfter);
+      const baselineRisk = Math.max(targetDefendedRisk + 1, activeDefense.riskBefore || riskScore.overall || 50);
+      const mitigationFactor = Math.min(1, Math.max(0.08, targetDefendedRisk / baselineRisk));
+
+      // Attenuate individual attack confidences and risks
+      for (const attack of attackResults.attacks) {
+        attack.risk = Math.max(2, Math.round(attack.risk * mitigationFactor));
+        attack.confidence = Math.max(0.05, Math.round(attack.confidence * mitigationFactor * 100) / 100);
+      }
+
+      riskScore.overall = targetDefendedRisk;
+      riskScore.location = Math.max(2, Math.round(riskScore.location * mitigationFactor));
+      riskScore.behavior = Math.max(2, Math.round(riskScore.behavior * mitigationFactor));
+      riskScore.identity = Math.max(2, Math.round(riskScore.identity * mitigationFactor));
+      riskScore.interest = Math.max(2, Math.round(riskScore.interest * mitigationFactor));
+      riskScore.reidentification = Math.max(2, Math.round(riskScore.reidentification * mitigationFactor));
+    }
+
+    // 4. Generate Groq AI Executive Risk Report
     let aiReport: string | null = null;
     try {
       aiReport = await generatePrivacyReport(attackResults.attacks, riskScore.overall);
@@ -204,9 +315,24 @@ export async function POST(req: Request) {
       attackRunId: attackRun._id,
       overallRisk: riskScore.overall,
       categoryRisks: riskScore,
+      riskComponents: riskScore.components,
+      mlEnhanced: riskScore.mlEnhanced,
       aiReport,
+      mlServiceOnline,
       mlServiceUsed,
       mlStats,
+      // Defense status
+      defenseActive: !!activeDefense,
+      activeDefense: activeDefense ? {
+        strategy: activeDefense.selectedStrategy,
+        strategyName: activeDefense.strategies?.[0]?.name || activeDefense.selectedStrategy,
+        appliedAt: activeDefense.createdAt,
+        riskBeforeDefense: activeDefense.riskBefore,
+        riskAfterDefense: activeDefense.riskAfter,
+        transformationLog: activeDefense.transformationLog || [],
+        mlRiskReduction: activeDefense.mlRiskReduction || 0,
+        mlModelsUsed: activeDefense.mlModelsUsed || [],
+      } : null,
       attacks: attackResults.attacks.map((a) => ({
         type: a.type,
         confidence: Math.round(a.confidence * 100),

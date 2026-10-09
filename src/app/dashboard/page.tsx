@@ -4,9 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  LineChart, Line, AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+} from "recharts";
+import {
   Shield, Target, ShieldCheck, MapPin, Activity, Fingerprint,
   Eye, AlertTriangle, TrendingUp, TrendingDown, Zap, RefreshCw,
-  Database, Brain, Trash2,
+  Database, Brain, Trash2, Wifi, WifiOff, Lock, ShieldAlert,
+  Bug, Radio, Cpu,
 } from "lucide-react";
 
 interface RiskData {
@@ -23,6 +28,30 @@ interface AttackFinding {
   confidence: number;
   risk: number;
   evidenceCount: number;
+}
+
+interface RiskHistory {
+  date: string;
+  overall: number;
+  location: number;
+  behavior: number;
+  identity: number;
+}
+
+interface MLStatus {
+  online: boolean;
+  version?: string;
+  models_loaded?: number;
+  model_names?: string[];
+}
+
+interface LeakStats {
+  total: number;
+  blocked: number;
+  byType: Record<string, number>;
+  bySeverity: Record<string, number>;
+  last24h: number;
+  last7d: number;
 }
 
 function getRiskColor(score: number) {
@@ -53,23 +82,51 @@ function getRiskLabel(score: number) {
   return "CRITICAL";
 }
 
+const RISK_CHART_COLORS = {
+  overall: "#00f0ff",
+  location: "#ff006e",
+  behavior: "#9945ff",
+  identity: "#ffb800",
+};
+
+const LEAK_COLORS = {
+  tracker: "#ff006e",
+  data_broker: "#dc2626",
+  pii_in_url: "#ffb800",
+  pii_in_form: "#f97316",
+  pii_in_request: "#eab308",
+  fingerprinting: "#9945ff",
+};
+
+const PIE_SEVERITY_COLORS = ["#00ff88", "#ffb800", "#ff006e", "#dc2626"];
+
 export default function DashboardPage() {
   const [risk, setRisk] = useState<RiskData>({ overall: 0, location: 0, behavior: 0, identity: 0, interest: 0, reidentification: 0 });
   const [findings, setFindings] = useState<AttackFinding[]>([]);
+  const [riskHistory, setRiskHistory] = useState<RiskHistory[]>([]);
   const [eventCount, setEventCount] = useState(0);
+  const [mlStatus, setMLStatus] = useState<MLStatus>({ online: false });
+  const [leakStats, setLeakStats] = useState<LeakStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [attacking, setAttacking] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [mlEnhanced, setMlEnhanced] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [riskRes, eventsRes] = await Promise.all([
+      const [riskRes, eventsRes, mlRes, leaksRes, historyRes] = await Promise.all([
         fetch("/api/risk"),
         fetch("/api/events?limit=1"),
+        fetch("/api/ml/status"),
+        fetch("/api/leaks").catch(() => null),
+        fetch("/api/risk?history=true").catch(() => null),
       ]);
+
       const riskData = await riskRes.json();
       const eventsData = await eventsRes.json();
+      const mlData = await mlRes.json();
+
       setRisk({
         overall: riskData.overall || 0,
         location: riskData.location || 0,
@@ -79,6 +136,27 @@ export default function DashboardPage() {
         reidentification: riskData.reidentification || 0,
       });
       setEventCount(eventsData.total || 0);
+      setMLStatus(mlData);
+
+      // Leak stats
+      if (leaksRes && leaksRes.ok) {
+        const leakData = await leaksRes.json();
+        setLeakStats(leakData.stats || null);
+      }
+
+      // Risk history
+      if (historyRes && historyRes.ok) {
+        const histData = await historyRes.json();
+        if (histData.history) {
+          setRiskHistory(histData.history.map((h: Record<string, unknown>) => ({
+            date: new Date(h.createdAt as string).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            overall: h.overall || 0,
+            location: h.location || 0,
+            behavior: h.behavior || 0,
+            identity: h.identity || 0,
+          })).reverse());
+        }
+      }
     } catch (e) {
       console.error("Fetch error:", e);
     } finally {
@@ -110,6 +188,7 @@ export default function DashboardPage() {
     try {
       await fetch("/api/synthetic", { method: "DELETE" });
       setFindings([]);
+      setRiskHistory([]);
       await fetchData();
     } catch (e) {
       console.error("Clear error:", e);
@@ -129,6 +208,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (data.attacks) setFindings(data.attacks);
+      setMlEnhanced(data.mlEnhanced || false);
       await fetchData();
     } catch (e) {
       console.error("Attack error:", e);
@@ -148,15 +228,26 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-px-text-secondary animate-pulse">Loading dashboard...</div>
+        <div className="flex items-center gap-3 text-px-text-secondary">
+          <div className="w-5 h-5 border-2 border-px-cyan border-t-transparent rounded-full animate-spin" />
+          Loading dashboard...
+        </div>
       </div>
     );
   }
 
+  // Leak pie chart data
+  const leakPieData = leakStats ? [
+    { name: "Low", value: leakStats.bySeverity.low || 0 },
+    { name: "Medium", value: leakStats.bySeverity.medium || 0 },
+    { name: "High", value: leakStats.bySeverity.high || 0 },
+    { name: "Critical", value: leakStats.bySeverity.critical || 0 },
+  ].filter(d => d.value > 0) : [];
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Shield className="w-8 h-8 text-px-cyan" />
@@ -166,7 +257,7 @@ export default function DashboardPage() {
             Your digital footprint attack surface overview
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button onClick={generateData} disabled={generating || clearing} className="btn-primary text-xs flex items-center gap-2 disabled:opacity-50">
             <Database className="w-4 h-4" />
             {generating ? "Generating..." : "Generate Test Data"}
@@ -184,31 +275,111 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Risk Gauge */}
+      {/* ML Status Banner */}
       <motion.div
-        className="glass-card p-8 text-center relative overflow-hidden"
-        initial={{ opacity: 0, y: 20 }}
+        className={`glass-card p-4 flex items-center justify-between ${mlStatus.online ? "border-px-emerald/30" : "border-risk-high/30"}`}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b opacity-30" style={{
-          backgroundImage: `radial-gradient(circle at 50% 80%, ${risk.overall > 60 ? 'rgba(255,0,110,0.15)' : 'rgba(0,240,255,0.15)'} 0%, transparent 60%)`
-        }} />
-        <div className="relative z-10">
-          <div className="text-xs text-px-text-muted uppercase tracking-[0.2em] mb-4 font-medium">
-            Live Privacy Risk
+        <div className="flex items-center gap-4">
+          <div className={`p-2 rounded-lg ${mlStatus.online ? "bg-px-emerald/10" : "bg-risk-high/10"}`}>
+            {mlStatus.online ? <Cpu className="w-5 h-5 text-px-emerald" /> : <WifiOff className="w-5 h-5 text-risk-high" />}
           </div>
-          <div className={`text-8xl font-black ${getRiskColor(risk.overall)} mb-2`}>
-            {risk.overall}
-          </div>
-          <div className="text-xl text-px-text-secondary">/100</div>
-          <div className={`mt-4 inline-block ${getRiskBadge(risk.overall)}`}>
-            {getRiskLabel(risk.overall)}
-          </div>
-          <div className="mt-4 text-xs text-px-text-muted">
-            {eventCount} events analyzed · moderate attacker model
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">ML Service</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${mlStatus.online ? "bg-px-emerald/15 text-px-emerald border border-px-emerald/30" : "bg-risk-high/15 text-risk-high border border-risk-high/30"}`}>
+                {mlStatus.online ? "ONLINE" : "OFFLINE"}
+              </span>
+              {mlEnhanced && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-px-purple/15 text-px-purple border border-px-purple/30">
+                  ML-ENHANCED
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-px-text-muted mt-0.5">
+              {mlStatus.online
+                ? `v${mlStatus.version || "2.0"} · ${mlStatus.models_loaded || 0} models loaded · ${(mlStatus.model_names || []).join(", ") || "ready to train"}`
+                : "Start the ML service: cd ml-service && python main.py"}
+            </p>
           </div>
         </div>
+        {mlStatus.online && (
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-px-purple" />
+            <span className="text-xs text-px-text-secondary">{mlStatus.models_loaded || 0} models</span>
+          </div>
+        )}
       </motion.div>
+
+      {/* Main Risk Gauge + Risk History Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Risk Gauge */}
+        <motion.div
+          className="glass-card p-8 text-center relative overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-b opacity-30" style={{
+            backgroundImage: `radial-gradient(circle at 50% 80%, ${risk.overall > 60 ? 'rgba(255,0,110,0.15)' : 'rgba(0,240,255,0.15)'} 0%, transparent 60%)`
+          }} />
+          <div className="relative z-10">
+            <div className="text-xs text-px-text-muted uppercase tracking-[0.2em] mb-4 font-medium">
+              Live Privacy Risk
+            </div>
+            <div className={`text-8xl font-black ${getRiskColor(risk.overall)} mb-2`}>
+              {risk.overall}
+            </div>
+            <div className="text-xl text-px-text-secondary">/100</div>
+            <div className={`mt-4 inline-block ${getRiskBadge(risk.overall)}`}>
+              {getRiskLabel(risk.overall)}
+            </div>
+            <div className="mt-4 text-xs text-px-text-muted">
+              {eventCount} events analyzed · moderate attacker model
+              {mlEnhanced && " · ML-enhanced"}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Risk History Chart */}
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-px-cyan" />
+            Risk History
+          </h2>
+          {riskHistory.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={riskHistory}>
+                <defs>
+                  <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00f0ff" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#00f0ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#243056" />
+                <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: "#1a2342", border: "1px solid #243056", borderRadius: 8, color: "#e2e8f0" }}
+                  labelStyle={{ color: "#94a3b8" }}
+                />
+                <Area type="monotone" dataKey="overall" stroke="#00f0ff" fill="url(#riskGrad)" strokeWidth={2} name="Overall" />
+                <Line type="monotone" dataKey="location" stroke="#ff006e" strokeWidth={1.5} dot={false} name="Location" />
+                <Line type="monotone" dataKey="behavior" stroke="#9945ff" strokeWidth={1.5} dot={false} name="Behavior" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-sm text-px-text-muted">
+              Run attacks to build risk history
+            </div>
+          )}
+        </motion.div>
+      </div>
 
       {/* Risk Categories */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -224,17 +395,85 @@ export default function DashboardPage() {
             <div className="text-xs text-px-text-muted uppercase tracking-wider mb-1">{cat.label}</div>
             <div className={`text-3xl font-bold ${getRiskColor(cat.value)}`}>{cat.value}</div>
             <div className="mt-2 h-1.5 bg-px-bg rounded-full overflow-hidden">
-              <div className={`h-full rounded-full bg-gradient-to-r ${getRiskBg(cat.value)}`}
-                style={{ width: `${cat.value}%` }} />
+              <motion.div
+                className={`h-full rounded-full bg-gradient-to-r ${getRiskBg(cat.value)}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${cat.value}%` }}
+                transition={{ duration: 0.8, delay: i * 0.1 }}
+              />
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Attack Findings & Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Data Leak Stats + Attack Findings */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Data Leak Alerts */}
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-risk-critical" />
+            Data Leak Detection
+          </h2>
+          {leakStats && leakStats.total > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-risk-critical/5 border border-risk-critical/20">
+                  <div className="text-2xl font-bold text-risk-critical">{leakStats.total}</div>
+                  <div className="text-xs text-px-text-muted">Total Detected</div>
+                </div>
+                <div className="p-3 rounded-lg bg-px-emerald/5 border border-px-emerald/20">
+                  <div className="text-2xl font-bold text-px-emerald">{leakStats.blocked}</div>
+                  <div className="text-xs text-px-text-muted">Blocked</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(leakStats.byType).map(([type, count]) => (
+                  <div key={type} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ background: LEAK_COLORS[type as keyof typeof LEAK_COLORS] || "#94a3b8" }} />
+                      <span className="text-px-text-secondary capitalize">{type.replace(/_/g, " ")}</span>
+                    </div>
+                    <span className="font-bold">{count}</span>
+                  </div>
+                ))}
+              </div>
+              {leakPieData.length > 0 && (
+                <ResponsiveContainer width="100%" height={120}>
+                  <PieChart>
+                    <Pie data={leakPieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={3} dataKey="value">
+                      {leakPieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_SEVERITY_COLORS[i % PIE_SEVERITY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#1a2342", border: "1px solid #243056", borderRadius: 8, color: "#e2e8f0", fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+              <Link href="/leaks" className="block text-center text-xs text-px-cyan hover:underline mt-2">
+                View All Leaks →
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-sm text-px-text-muted">
+              <Lock className="w-8 h-8 mb-3 text-px-emerald/50" />
+              <p>No leaks detected yet</p>
+              <p className="text-xs mt-1">Install the extension to start monitoring</p>
+            </div>
+          )}
+        </motion.div>
+
         {/* Findings */}
-        <div className="glass-card p-6">
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
             <Brain className="w-5 h-5 text-px-purple" />
             Attack Findings
@@ -245,7 +484,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {findings.slice(0, 6).map((f, i) => (
+              {findings.slice(0, 7).map((f, i) => (
                 <motion.div
                   key={f.type}
                   className="flex items-center justify-between py-2 border-b border-px-border/50 last:border-0"
@@ -265,10 +504,15 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Quick Actions */}
-        <div className="glass-card p-6">
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
             <Zap className="w-5 h-5 text-px-amber" />
             Quick Actions
@@ -277,8 +521,10 @@ export default function DashboardPage() {
             {[
               { href: "/attack", icon: Target, label: "Run Privacy Attack", desc: "Full attack battery simulation", color: "text-px-magenta" },
               { href: "/defense", icon: ShieldCheck, label: "Apply Defense", desc: "Compare privacy strategies", color: "text-px-emerald" },
+              { href: "/leaks", icon: ShieldAlert, label: "Data Leaks", desc: "View detected leaks & trackers", color: "text-risk-critical" },
               { href: "/regression", icon: RefreshCw, label: "Regression Test", desc: "Test privacy after changes", color: "text-px-amber" },
               { href: "/graph", icon: Brain, label: "Evidence Graph", desc: "Visualize attack evidence", color: "text-px-purple" },
+              { href: "/inferences", icon: Bug, label: "Inferences", desc: "What attackers could learn", color: "text-px-cyan" },
             ].map((action) => (
               <Link key={action.href} href={action.href}
                 className="flex items-center gap-4 p-3 rounded-lg hover:bg-px-surface transition-colors group"
@@ -291,7 +537,7 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
