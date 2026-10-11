@@ -11,6 +11,8 @@ const config: Config = {
         "px-bg-tertiary": "#151d35",
         "px-surface": "#1a2342",
         "px-surface-hover": "#1f2b50",
+        "px-surface-light": "#1f2b4f",
+        "px-card": "#141c34",
         "px-border": "#243056",
         "px-border-light": "#2d3a66",
 

@@ -71,18 +71,20 @@ export function computeRisk(
   const w = mlAvailable ? WEIGHTS : WEIGHTS_NO_ML;
 
   // Evidence strength: average confidence across attacks
+  const attackCount = attackResults.attacks.length;
   const evidenceStrength =
-    attackResults.attacks.reduce((sum, a) => sum + a.confidence, 0) /
-    attackResults.attacks.length;
+    attackCount > 0
+      ? attackResults.attacks.reduce((sum, a) => sum + (a.confidence || 0), 0) / attackCount
+      : 0;
 
   // Uniqueness from features
-  const uniqueness = features.uniqueness.overallUniqueness;
+  const uniqueness = features.uniqueness.overallUniqueness || 0;
 
   // Temporal consistency
-  const temporalConsistency = features.temporal.temporalConsistency;
+  const temporalConsistency = features.temporal.temporalConsistency || 0;
 
   // Cross-source support
-  const crossSourceSupport = features.crossSource.overallCorrelation;
+  const crossSourceSupport = features.crossSource.overallCorrelation || 0;
 
   // Adversary prior based on profile
   const adversaryPriorMap: Record<AdversaryProfile, number> = {
@@ -91,13 +93,13 @@ export function computeRisk(
     strong: 0.6,
     targeted: 0.85,
   };
-  const adversaryPrior = adversaryPriorMap[attackResults.adversaryProfile];
+  const adversaryPrior = adversaryPriorMap[attackResults.adversaryProfile] || 0.3;
 
   // ML Risk Adjustment — blended from ML ensemble prediction
   let mlRiskAdjustment = 0;
   if (mlAvailable && mlRiskInput) {
     // ML risk_score is 0-100, normalize to 0-1
-    mlRiskAdjustment = mlRiskInput.risk_score / 100;
+    mlRiskAdjustment = (mlRiskInput.risk_score || 0) / 100;
   }
 
   // Contradiction penalty: if attacks contradict each other
@@ -113,15 +115,15 @@ export function computeRisk(
     w.mlRiskAdjustment * mlRiskAdjustment -
     w.contradictionPenalty * contradictionPenalty;
 
-  const normalizedRisk = Math.round(Math.max(0, Math.min(100, rawRisk * 100)));
+  const normalizedRisk = Math.round(Math.max(0, Math.min(100, (isNaN(rawRisk) ? 0 : rawRisk) * 100)));
 
   return {
     overall: normalizedRisk,
-    location: attackResults.categoryRisks.location,
-    behavior: attackResults.categoryRisks.behavior,
-    identity: attackResults.categoryRisks.identity,
-    interest: attackResults.categoryRisks.interest,
-    reidentification: attackResults.categoryRisks.reidentification,
+    location: attackResults.categoryRisks?.location || 0,
+    behavior: attackResults.categoryRisks?.behavior || 0,
+    identity: attackResults.categoryRisks?.identity || 0,
+    interest: attackResults.categoryRisks?.interest || 0,
+    reidentification: attackResults.categoryRisks?.reidentification || 0,
     components: {
       evidenceStrength: Math.round(evidenceStrength * 100),
       uniqueness: Math.round(uniqueness * 100),
@@ -137,15 +139,11 @@ export function computeRisk(
 }
 
 function computeContradictionPenalty(results: AttackBatteryResult): number {
-  // If home and work inference both high but with contradictory evidence,
-  // there's a contradiction. Currently simplified.
-  const confidences = results.attacks.map((a) => a.confidence);
+  if (!results.attacks || results.attacks.length === 0) return 0;
+  const confidences = results.attacks.map((a) => a.confidence || 0);
+  const mean = confidences.reduce((s, v) => s + v, 0) / confidences.length;
   const variance =
-    confidences.reduce((sum, c) => {
-      const mean = confidences.reduce((s, v) => s + v, 0) / confidences.length;
-      return sum + Math.pow(c - mean, 2);
-    }, 0) / confidences.length;
+    confidences.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / confidences.length;
 
-  // High variance in confidence suggests contradictory evidence
-  return Math.min(1, variance * 2);
+  return Math.min(1, Math.max(0, variance * 2));
 }

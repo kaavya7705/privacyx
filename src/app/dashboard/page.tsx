@@ -101,6 +101,7 @@ const LEAK_COLORS = {
 const PIE_SEVERITY_COLORS = ["#00ff88", "#ffb800", "#ff006e", "#dc2626"];
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
   const [risk, setRisk] = useState<RiskData>({ overall: 0, location: 0, behavior: 0, identity: 0, interest: 0, reidentification: 0 });
   const [findings, setFindings] = useState<AttackFinding[]>([]);
   const [riskHistory, setRiskHistory] = useState<RiskHistory[]>([]);
@@ -112,6 +113,10 @@ export default function DashboardPage() {
   const [attacking, setAttacking] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [mlEnhanced, setMlEnhanced] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -352,7 +357,7 @@ export default function DashboardPage() {
             <TrendingUp className="w-5 h-5 text-px-cyan" />
             Risk History
           </h2>
-          {riskHistory.length > 0 ? (
+          {mounted && riskHistory.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={riskHistory}>
                 <defs>
@@ -375,7 +380,7 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-[220px] text-sm text-px-text-muted">
-              Run attacks to build risk history
+              {mounted ? "Run attacks to build risk history" : "Loading risk visualization..."}
             </div>
           )}
         </motion.div>
@@ -442,7 +447,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              {leakPieData.length > 0 && (
+              {mounted && leakPieData.length > 0 && (
                 <ResponsiveContainer width="100%" height={120}>
                   <PieChart>
                     <Pie data={leakPieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={3} dataKey="value">

@@ -12,6 +12,7 @@ const PROTECTED_ROUTES = [
   "/inferences",
   "/graph",
   "/defense",
+  "/leaks",
   "/regression",
   "/experiments",
   "/history",
@@ -26,11 +27,12 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith(route)
   );
 
-  // API routes that need auth (exclude auth endpoints and extension API)
+  // API routes that need auth (exclude auth endpoints and extension APIs)
   const isProtectedAPI =
     pathname.startsWith("/api/") &&
     !pathname.startsWith("/api/auth/") &&
-    !pathname.startsWith("/api/events"); // Events API handles its own auth for extension tokens
+    !pathname.startsWith("/api/events") && // Events API handles its own auth for extension tokens
+    !pathname.startsWith("/api/leaks"); // Leaks API handles its own auth for extension tokens
 
   if (isProtected) {
     const token = req.cookies.get(COOKIE_NAME)?.value;

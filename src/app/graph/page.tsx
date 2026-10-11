@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch } from "lucide-react";
+import Link from "next/link";
+import { GitBranch, Target, Sparkles, RefreshCw } from "lucide-react";
 
 interface GraphData {
   nodes: Array<{ nodeId: string; type: string; label: string; data: Record<string, unknown>; position: { x: number; y: number } }>;
@@ -18,13 +19,19 @@ const NODE_COLORS: Record<string, string> = {
 export default function GraphPage() {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchGraph = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/graph");
       const data = await res.json();
       setGraph(data);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchGraph(); }, [fetchGraph]);
@@ -35,8 +42,29 @@ export default function GraphPage() {
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <GitBranch className="w-8 h-8 text-px-purple" /> Evidence Graph
         </h1>
-        <div className="glass-card p-12 text-center text-px-text-muted">
-          No evidence graph yet. Run an attack first to generate the evidence graph.
+        <div className="glass-card p-12 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-px-purple/10 border border-px-purple/30 flex items-center justify-center mx-auto text-px-purple">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-base text-white">No evidence connections discovered yet</h3>
+            <p className="text-xs text-px-text-muted max-w-sm mx-auto">
+              Simulate an attack battery to map out relationships between signals, time patterns, and adversary inferences.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={fetchGraph}
+              className="btn-secondary text-xs flex items-center gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>Check for Updates</span>
+            </button>
+            <Link href="/attack" className="btn-primary text-xs flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              <span>Run Attack Battery</span>
+            </Link>
+          </div>
         </div>
       </div>
     );

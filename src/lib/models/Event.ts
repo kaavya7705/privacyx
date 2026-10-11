@@ -6,6 +6,7 @@ export interface IEvent extends Document {
   type: string;
   category: string;
   domainCategory: string;
+  domain?: string;
   timeBucket: string;
   durationBucket: string;
   dayOfWeek: number;
@@ -26,6 +27,7 @@ const EventSchema = new Schema<IEvent>(
     type: { type: String, required: true },
     category: { type: String, required: true },
     domainCategory: { type: String, default: "unknown" },
+    domain: { type: String, default: "" },
     timeBucket: { type: String, required: true },
     durationBucket: { type: String, default: "<1m" },
     dayOfWeek: { type: Number, min: 0, max: 6 },

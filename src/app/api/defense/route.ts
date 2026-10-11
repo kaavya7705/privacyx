@@ -5,7 +5,6 @@ import { DefenseRun } from "@/lib/models/DefenseRun";
 import { RiskSnapshot } from "@/lib/models/RiskSnapshot";
 import { getSession } from "@/lib/auth";
 import { compareDefenses, applyDefense } from "@/lib/engine/defenses";
-import { generateSyntheticData } from "@/lib/engine/synthetic";
 import {
   eventsToFeatureVectors,
   runMLDefensePrediction,
@@ -27,17 +26,6 @@ export async function POST(req: Request) {
       .sort({ createdAt: -1 })
       .limit(1000);
 
-    if (events.length === 0) {
-      const starter = generateSyntheticData("student", 7, 12);
-      const docs = starter.events.map((e) => ({
-        ...e,
-        userId: session.userId,
-      }));
-      await Event.insertMany(docs);
-      events = await Event.find({ userId: session.userId })
-        .sort({ createdAt: -1 })
-        .limit(1000);
-    }
 
     const lastSnapshot = (await RiskSnapshot.findOne({ userId: session.userId })
       .sort({ createdAt: -1 })
@@ -52,23 +40,30 @@ export async function POST(req: Request) {
         { $set: { active: false, deactivatedAt: new Date() } }
       );
 
-      // Restore un-defended synthetic telemetry
-      await Event.deleteMany({ userId: session.userId });
-      const starter = generateSyntheticData("student", 7, 12);
-      const docs = starter.events.map((e) => ({
-        ...e,
-        userId: session.userId,
-      }));
-      await Event.insertMany(docs);
+      // Clean up injected synthetic defense noise, but keep real user events
+      await Event.deleteMany({ userId: session.userId, "metadata.defenseNoise": true });
+
+      // Recompute baseline risk from remaining authentic events
+      const remainingEvents = await Event.find({ userId: session.userId }).sort({ createdAt: -1 }).limit(1000).lean();
+      let restoredRisk = 50;
+      if (remainingEvents.length > 0) {
+        const { extractFeatures } = await import("@/lib/engine/features");
+        const { runAttackBattery } = await import("@/lib/engine/attacks");
+        const { computeRisk } = await import("@/lib/engine/risk");
+        const feats = extractFeatures(remainingEvents as unknown as IEvent[]);
+        const attacks = runAttackBattery(feats);
+        const rScore = computeRisk(feats, attacks);
+        restoredRisk = rScore.overall;
+      }
 
       await RiskSnapshot.create({
         userId: session.userId,
-        overall: 75,
+        overall: restoredRisk,
         breakdown: {
-          location: 78,
-          temporal: 72,
-          behavioral: 80,
-          identity: 70,
+          location: restoredRisk,
+          temporal: restoredRisk,
+          behavioral: restoredRisk,
+          identity: restoredRisk,
         },
       });
 
@@ -304,23 +299,29 @@ export async function DELETE() {
       { $set: { active: false, deactivatedAt: new Date() } }
     );
 
-    // Restore un-defended synthetic telemetry
-    await Event.deleteMany({ userId: session.userId });
-    const starter = generateSyntheticData("student", 7, 12);
-    const docs = starter.events.map((e) => ({
-      ...e,
-      userId: session.userId,
-    }));
-    await Event.insertMany(docs);
+    // Clean up injected synthetic defense noise, but keep real user events
+    await Event.deleteMany({ userId: session.userId, "metadata.defenseNoise": true });
+
+    const remainingEvents = await Event.find({ userId: session.userId }).sort({ createdAt: -1 }).limit(1000).lean();
+    let restoredRisk = 50;
+    if (remainingEvents.length > 0) {
+      const { extractFeatures } = await import("@/lib/engine/features");
+      const { runAttackBattery } = await import("@/lib/engine/attacks");
+      const { computeRisk } = await import("@/lib/engine/risk");
+      const feats = extractFeatures(remainingEvents as unknown as IEvent[]);
+      const attacks = runAttackBattery(feats);
+      const rScore = computeRisk(feats, attacks);
+      restoredRisk = rScore.overall;
+    }
 
     await RiskSnapshot.create({
       userId: session.userId,
-      overall: 75,
+      overall: restoredRisk,
       breakdown: {
-        location: 78,
-        temporal: 72,
-        behavioral: 80,
-        identity: 70,
+        location: restoredRisk,
+        temporal: restoredRisk,
+        behavioral: restoredRisk,
+        identity: restoredRisk,
       },
     });
 

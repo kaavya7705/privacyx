@@ -8,6 +8,7 @@ import {
   Database, Cpu, RefreshCw, AlertTriangle, Layers, FileCheck, ExternalLink
 } from "lucide-react";
 import Link from "next/link";
+import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 
 interface AttackComparison {
   type: string;
@@ -322,11 +323,13 @@ export default function DefensePage() {
               <h3 className="text-xl font-bold text-px-text">
                 {autoDefense.recommendedStrategyName}
               </h3>
-              <ul className="text-xs text-px-text-secondary space-y-1">
+              <ul className="text-xs text-px-text-secondary space-y-1.5">
                 {autoDefense.rationale.map((r, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-px-cyan" />
-                    {r}
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-px-cyan mt-1.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <MarkdownRenderer content={r} />
+                    </div>
                   </li>
                 ))}
               </ul>

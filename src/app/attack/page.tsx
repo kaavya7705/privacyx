@@ -8,6 +8,7 @@ import {
   ShieldAlert, RefreshCw, ArrowRight, TrendingDown, Layers, Zap
 } from "lucide-react";
 import Link from "next/link";
+import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 
 type AdversaryProfile = "weak" | "moderate" | "strong" | "targeted";
 
@@ -527,8 +528,8 @@ export default function AttackPage() {
                   <CheckCircle className="w-3.5 h-3.5 text-px-emerald" /> Verified by PrivacyX Engine
                 </div>
               </div>
-              <div className="text-sm text-px-text-secondary whitespace-pre-line leading-relaxed bg-px-bg/50 p-4 rounded-lg border border-px-border">
-                {aiReport}
+              <div className="bg-px-bg/50 p-5 rounded-lg border border-px-border">
+                <MarkdownRenderer content={aiReport} />
               </div>
             </motion.div>
           )}
@@ -536,15 +537,16 @@ export default function AttackPage() {
           {/* Individual Attacks List */}
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-px-text-muted uppercase tracking-wider px-1">
-              <span>9 Adversarial Attack Vectors Evaluated</span>
+              <span>{results.length} Adversarial Attack Vectors Evaluated</span>
               <span>Confidence & Risk</span>
             </div>
 
             {results.map((attack, i) => {
               const isMitigated = activeDefense && attack.risk <= 35;
+              const attackKey = `${attack.type}-${i}`;
               return (
                 <motion.div
-                  key={attack.type}
+                  key={attackKey}
                   className="glass-card overflow-hidden"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -671,28 +673,22 @@ export default function AttackPage() {
                                   <span>AI Threat Analysis (openai/gpt-oss-20b)</span>
                                 </div>
                                 <div>
-                                  <div className="text-[11px] uppercase tracking-wider text-px-text-muted">
+                                  <div className="text-[11px] uppercase tracking-wider text-px-text-muted mb-1">
                                     Adversary Narrative
                                   </div>
-                                  <p className="text-sm text-px-text mt-1">
-                                    {explanations[attack.type].attackNarrative}
-                                  </p>
+                                  <MarkdownRenderer content={explanations[attack.type].attackNarrative} />
                                 </div>
                                 <div>
-                                  <div className="text-[11px] uppercase tracking-wider text-px-text-muted">
+                                  <div className="text-[11px] uppercase tracking-wider text-px-text-muted mb-1">
                                     Evidence Evaluation
                                   </div>
-                                  <p className="text-xs text-px-text-secondary whitespace-pre-line mt-1">
-                                    {explanations[attack.type].evidenceExplanation}
-                                  </p>
+                                  <MarkdownRenderer content={explanations[attack.type].evidenceExplanation} />
                                 </div>
                                 <div className="p-2.5 rounded bg-px-emerald/10 border border-px-emerald/30">
-                                  <div className="text-[11px] uppercase tracking-wider text-px-emerald font-bold">
+                                  <div className="text-[11px] uppercase tracking-wider text-px-emerald font-bold mb-1">
                                     Recommended Remediation
                                   </div>
-                                  <p className="text-xs text-px-text-secondary mt-1">
-                                    {explanations[attack.type].remediation}
-                                  </p>
+                                  <MarkdownRenderer content={explanations[attack.type].remediation} />
                                 </div>
                               </div>
                             )}

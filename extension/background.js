@@ -75,28 +75,66 @@ const DATA_BROKER_DOMAINS = new Set([
 // Domain categorization (mirrors server-side categorizer)
 // =========================================================================
 const DOMAIN_CATEGORIES = {
-  technology: ["github.com", "stackoverflow.com", "npmjs.com", "gitlab.com", "dev.to", "medium.com", "techcrunch.com", "hackernews.com", "news.ycombinator.com"],
-  education: ["coursera.org", "udemy.com", "edx.org", "khanacademy.org", "scholar.google.com", "wikipedia.org", "academia.edu"],
-  career: ["linkedin.com", "indeed.com", "glassdoor.com", "wellfound.com"],
-  finance: ["bloomberg.com", "cnbc.com", "yahoo.com/finance", "coinbase.com"],
-  healthcare: ["webmd.com", "mayoclinic.org", "healthline.com", "nih.gov"],
-  shopping: ["amazon.com", "ebay.com", "walmart.com", "flipkart.com", "myntra.com"],
-  entertainment: ["youtube.com", "netflix.com", "twitch.tv", "spotify.com"],
-  social: ["facebook.com", "twitter.com", "x.com", "instagram.com", "reddit.com", "tiktok.com", "discord.com"],
-  travel: ["booking.com", "airbnb.com", "maps.google.com", "makemytrip.com"],
-  news: ["bbc.com", "cnn.com", "nytimes.com", "ndtv.com"],
-  sports: ["espn.com", "cricbuzz.com"],
-  gaming: ["store.steampowered.com", "epicgames.com"],
-  developer_tools: ["github.com", "gitlab.com", "vscode.dev", "replit.com"],
-  search: ["google.com", "bing.com", "duckduckgo.com"],
+  technology: ["github.com", "stackoverflow.com", "npmjs.com", "gitlab.com", "dev.to", "medium.com", "techcrunch.com", "hackernews.com", "news.ycombinator.com", "openai.com", "anthropic.com", "huggingface.co", "vercel.com", "aws.amazon.com"],
+  education: ["coursera.org", "udemy.com", "edx.org", "khanacademy.org", "scholar.google.com", "wikipedia.org", "academia.edu", "mit.edu", "stanford.edu", "harvard.edu", "duolingo.com", "quizlet.com"],
+  career: ["linkedin.com", "indeed.com", "glassdoor.com", "wellfound.com", "monster.com", "ziprecruiter.com", "upwork.com", "fiverr.com", "workday.com"],
+  finance: ["bloomberg.com", "cnbc.com", "yahoo.com/finance", "coinbase.com", "binance.com", "paypal.com", "stripe.com", "robinhood.com", "chase.com", "bankofamerica.com", "wellsfargo.com", "fidelity.com"],
+  healthcare: ["webmd.com", "mayoclinic.org", "healthline.com", "nih.gov", "cdc.gov", "who.int", "drugs.com", "cvs.com", "walgreens.com", "goodrx.com", "psychologytoday.com"],
+  shopping: ["amazon.com", "ebay.com", "walmart.com", "flipkart.com", "myntra.com", "target.com", "bestbuy.com", "etsy.com", "aliexpress.com", "shopify.com"],
+  entertainment: ["youtube.com", "netflix.com", "twitch.tv", "spotify.com", "hulu.com", "disneyplus.com", "primevideo.com", "imdb.com", "soundcloud.com", "tiktok.com"],
+  social: ["facebook.com", "twitter.com", "x.com", "instagram.com", "reddit.com", "discord.com", "threads.net", "telegram.org", "whatsapp.com", "pinterest.com"],
+  travel: ["booking.com", "airbnb.com", "maps.google.com", "makemytrip.com", "expedia.com", "tripadvisor.com", "uber.com", "lyft.com"],
+  news: ["bbc.com", "cnn.com", "nytimes.com", "ndtv.com", "theguardian.com", "washingtonpost.com", "reuters.com", "forbes.com"],
+  sports: ["espn.com", "cricbuzz.com", "nba.com", "nfl.com", "fifa.com", "strava.com"],
+  gaming: ["store.steampowered.com", "epicgames.com", "xbox.com", "playstation.com", "roblox.com", "ign.com"],
+  developer_tools: ["github.com", "gitlab.com", "vscode.dev", "replit.com", "codesandbox.io", "codepen.io"],
+  search: ["google.com", "bing.com", "duckduckgo.com", "kagi.com", "brave.com"],
+};
+
+const CATEGORY_KEYWORDS = {
+  healthcare: ["health", "med", "doctor", "clinic", "hospital", "pharma", "rx", "care", "cure", "patient", "therapy", "psych", "dental"],
+  finance: ["bank", "finance", "invest", "trade", "stock", "crypto", "pay", "money", "wallet", "credit", "loan", "fund", "insur"],
+  career: ["job", "career", "hire", "recruit", "resume", "work", "employ", "intern", "staff"],
+  technology: ["tech", "dev", "code", "program", "software", "api", "cloud", "data", "cyber", "ai", "ml", "bot"],
+  education: ["edu", "learn", "course", "university", "school", "study", "tutorial", "academy", "college"],
+  shopping: ["shop", "store", "buy", "deal", "sale", "market", "cart", "product", "price"],
+  entertainment: ["movie", "music", "video", "stream", "show", "cinema", "song", "film"],
+  social: ["social", "chat", "message", "friend", "community", "forum", "network"],
+  travel: ["travel", "hotel", "flight", "booking", "trip", "tour", "vacation", "map"],
+  news: ["news", "press", "journal", "report", "daily", "times", "herald", "gazette", "post"],
+  sports: ["sport", "team", "league", "score", "match", "player", "fitness", "gym"],
+  gaming: ["game", "gaming", "esport", "steam", "play", "arcade"],
 };
 
 function categorizeDomain(domain) {
-  const normalized = domain.toLowerCase().replace(/^www\./, "");
+  const normalized = domain.toLowerCase().replace(/^www\./, "").trim();
+
+  // 1. Exact catalog match
   for (const [category, domains] of Object.entries(DOMAIN_CATEGORIES)) {
-    if (domains.some(d => normalized.includes(d))) return category;
+    if (domains.some(d => normalized === d || normalized.endsWith(`.${d}`) || normalized.includes(d))) {
+      return category;
+    }
   }
-  return "unknown";
+
+  // 2. TLD indicators
+  if (normalized.endsWith(".edu") || normalized.includes(".edu.")) return "education";
+  if (normalized.endsWith(".gov") || normalized.includes(".gov.")) return "government";
+
+  // 3. Keyword matching
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => normalized.includes(kw))) {
+      return category;
+    }
+  }
+
+  // 4. Derive from SLD name — NEVER return "unknown"
+  const parts = normalized.split(".");
+  const mainPart = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+  if (mainPart && mainPart.length > 2) {
+    return `${mainPart}_web`;
+  }
+
+  return "general_web";
 }
 
 function getTimeBucket(date) {
@@ -110,11 +148,13 @@ function getTimeBucket(date) {
 
 function getSensitivity(category) {
   const map = {
-    healthcare: 0.9, finance: 0.8, career: 0.7, social: 0.6, travel: 0.6,
-    shopping: 0.5, education: 0.3, entertainment: 0.3, technology: 0.2,
-    developer_tools: 0.2, news: 0.2, sports: 0.2, gaming: 0.2, search: 0.4,
+    healthcare: 0.95, finance: 0.90, career: 0.75, government: 0.75,
+    social: 0.65, travel: 0.60, shopping: 0.50, education: 0.35,
+    entertainment: 0.30, technology: 0.20, developer_tools: 0.20,
+    news: 0.25, sports: 0.20, gaming: 0.20, search: 0.45,
+    general_web: 0.45,
   };
-  return map[category] || 0.5;
+  return map[category] || 0.45;
 }
 
 // =========================================================================
@@ -187,106 +227,219 @@ function scanUrlForPII(url) {
   }
 }
 
-// =========================================================================
-// Tab Update Handler — Core event collection
-// =========================================================================
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete" || !tab.url) return;
-  if (tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) return;
-  if (tab.url.startsWith("about:")) return;
+// Local cache for AI-classified domains and visit deduplication
+const domainAiCache = new Map();
+const recentDomainVisits = new Map(); // domain -> timestamp ms
 
-  chrome.storage.local.get(["monitoring", "apiToken", "apiUrl", "shieldMode"], (data) => {
-    if (!data.monitoring || data.monitoring.paused) return;
-    if (!data.apiToken) return;
+async function classifyDomainWithServer(domain, apiUrl = "http://localhost:3000") {
+  const normalized = domain.toLowerCase().replace(/^www\./, "").trim();
+  if (domainAiCache.has(normalized)) {
+    return domainAiCache.get(normalized);
+  }
 
-    try {
-      const url = new URL(tab.url);
-      const domain = url.hostname;
+  // 1. Instant local heuristic categorization
+  const heuristicCategory = categorizeDomain(normalized);
+  const heuristicSensitivity = getSensitivity(heuristicCategory);
+  const isHigh = heuristicSensitivity >= 0.70;
+  const baseline = {
+    domain: normalized,
+    category: heuristicCategory,
+    sensitivity: heuristicSensitivity,
+    riskLevel: isHigh ? "high" : (heuristicSensitivity >= 0.50 ? "medium" : "low"),
+    isHighRisk: isHigh,
+    source: "local_heuristic",
+  };
 
-      // Skip localhost / the PrivacyX app itself
-      if (domain === "localhost" || domain === "127.0.0.1") return;
+  // 2. Query server AI classification (Groq AI llama-3.3-70b-versatile or ML NLP)
+  try {
+    const targetUrl = `${apiUrl || "http://localhost:3000"}/api/classify?domain=${encodeURIComponent(normalized)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(targetUrl, { signal: controller.signal });
+    clearTimeout(timer);
 
-      // --- Tracker Detection ---
-      if (isTrackerDomain(domain)) {
-        sessionStats.trackersBlocked++;
-        recordLeak("tracker", domain, "medium", data.shieldMode === "active");
-        updateBadge();
-        return; // Don't collect events from tracker domains
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.category) {
+        const enriched = {
+          domain: normalized,
+          category: data.category,
+          sensitivity: typeof data.sensitivity === "number" ? data.sensitivity : heuristicSensitivity,
+          riskLevel: data.riskLevel || (data.sensitivity >= 0.70 ? "high" : "low"),
+          isHighRisk: Boolean(data.isHighRisk || data.sensitivity >= 0.70),
+          source: data.model ? "groq_ai" : "ai_engine",
+        };
+        domainAiCache.set(normalized, enriched);
+        return enriched;
       }
+    }
+  } catch (err) {
+    // Graceful fallback to baseline
+  }
 
-      // --- Data Broker Detection ---
-      if (isDataBroker(domain)) {
-        sessionStats.leaksBlocked++;
-        recordLeak("data_broker", domain, "critical", true);
-        
-        // Warn the user
-        chrome.notifications.create(`broker-${Date.now()}`, {
+  domainAiCache.set(normalized, baseline);
+  return baseline;
+}
+
+// =========================================================================
+// Tab Navigation Handler — Captures all browsed domains immediately
+// =========================================================================
+async function processTabNavigation(tab, trigger = "updated") {
+  if (!tab || !tab.url) return;
+  if (
+    tab.url.startsWith("chrome://") ||
+    tab.url.startsWith("chrome-extension://") ||
+    tab.url.startsWith("about:") ||
+    tab.url.startsWith("edge://") ||
+    tab.url.startsWith("brave://") ||
+    tab.url.startsWith("devtools://")
+  ) {
+    return;
+  }
+
+  let urlObj;
+  try {
+    urlObj = new URL(tab.url);
+  } catch {
+    return;
+  }
+
+  const hostname = urlObj.hostname;
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") return;
+
+  const domain = hostname.toLowerCase().replace(/^www\./, "").trim();
+  const now = Date.now();
+
+  // Deduplication per domain (don't capture more than once every 6 seconds)
+  const lastTime = recentDomainVisits.get(domain);
+  if (lastTime && now - lastTime < 6000) {
+    return;
+  }
+  recentDomainVisits.set(domain, now);
+
+  if (recentDomainVisits.size > 150) {
+    for (const [d, t] of recentDomainVisits.entries()) {
+      if (now - t > 30000) recentDomainVisits.delete(d);
+    }
+  }
+
+  chrome.storage.local.get(["monitoring", "apiToken", "apiUrl", "shieldMode", "recentEvents"], async (data) => {
+    if (data.monitoring?.paused) return;
+
+    // --- Tracker Detection ---
+    if (isTrackerDomain(domain)) {
+      sessionStats.trackersBlocked++;
+      recordLeak("tracker", domain, "medium", data.shieldMode === "active");
+      updateBadge();
+      return;
+    }
+
+    // --- Data Broker Detection ---
+    if (isDataBroker(domain)) {
+      sessionStats.leaksBlocked++;
+      recordLeak("data_broker", domain, "critical", true);
+      chrome.notifications.create(`broker-${Date.now()}`, {
+        type: "basic",
+        iconUrl: "icons/icon128.png",
+        title: "⚠️ Data Broker Blocked",
+        message: `PrivacyX Shield intercepted high-risk data broker: ${domain}`,
+        priority: 2,
+      });
+      updateBadge();
+      return;
+    }
+
+    // --- PII in URL Detection ---
+    const urlPII = scanUrlForPII(tab.url);
+    if (urlPII.length > 0) {
+      sessionStats.piiDetected += urlPII.length;
+      for (const finding of urlPII) {
+        recordLeak("pii_in_url", domain, finding.severity, false, finding);
+      }
+      const criticalFindings = urlPII.filter((f) => f.severity === "critical");
+      if (criticalFindings.length > 0) {
+        chrome.notifications.create(`pii-${Date.now()}`, {
           type: "basic",
           iconUrl: "icons/icon128.png",
-          title: "⚠️ Data Broker Detected",
-          message: `PrivacyX blocked connection to known data broker: ${domain}`,
+          title: "🔴 Sensitive Data in URL!",
+          message: `Detected ${criticalFindings.map((f) => f.label).join(", ")} on ${domain}`,
           priority: 2,
         });
-        
-        updateBadge();
-        return;
       }
+    }
 
-      // --- PII in URL Detection ---
-      const urlPII = scanUrlForPII(tab.url);
-      if (urlPII.length > 0) {
-        sessionStats.piiDetected += urlPII.length;
-        for (const finding of urlPII) {
-          recordLeak("pii_in_url", domain, finding.severity, false, finding);
-        }
+    // --- AI / ML Classification for the domain ---
+    const classification = await classifyDomainWithServer(domain, data.apiUrl);
+    const dateObj = new Date();
+    const eventTime = dateObj.toISOString();
 
-        // Notify for critical PII
-        const criticalFindings = urlPII.filter(f => f.severity === "critical");
-        if (criticalFindings.length > 0) {
-          chrome.notifications.create(`pii-${Date.now()}`, {
-            type: "basic",
-            iconUrl: "icons/icon128.png",
-            title: "🔴 Sensitive Data in URL!",
-            message: `Detected ${criticalFindings.map(f => f.label).join(", ")} in URL parameters on ${domain}`,
-            priority: 2,
-          });
-        }
-      }
+    const event = {
+      domain: domain,
+      source: "browser",
+      type: "domain_visit",
+      category: classification.category,
+      domainCategory: classification.category,
+      timeBucket: getTimeBucket(dateObj),
+      durationBucket: "<1m",
+      dayOfWeek: dateObj.getDay(),
+      hourOfDay: dateObj.getHours(),
+      sensitivity: classification.sensitivity,
+      riskLevel: classification.riskLevel,
+      isHighRisk: classification.isHighRisk,
+      createdAt: eventTime,
+      timestamp: eventTime,
+      metadata: {
+        domain: domain,
+        url: tab.url ? tab.url.split("?")[0] : domain,
+        classifiedBy: classification.source,
+        synthetic: false,
+        hasTracker: false,
+        piiDetected: urlPII.length > 0,
+      },
+    };
 
-      // --- Standard event collection ---
-      const category = categorizeDomain(domain);
-      const now = new Date();
+    // Store in local storage recentEvents (top 30 events) so popup displays it immediately!
+    const existingEvents = Array.isArray(data.recentEvents) ? data.recentEvents : [];
+    const updatedEvents = [event, ...existingEvents.slice(0, 29)];
+    chrome.storage.local.set({ recentEvents: updatedEvents });
 
-      const event = {
-        source: "browser",
-        type: "domain_visit",
-        category: category,
-        domainCategory: category,
-        timeBucket: getTimeBucket(now),
-        durationBucket: "<1m",
-        dayOfWeek: now.getDay(),
-        hourOfDay: now.getHours(),
-        sensitivity: getSensitivity(category),
-        metadata: {
-          synthetic: false,
-          hasTracker: false,
-          piiDetected: urlPII.length > 0,
-        },
-      };
+    // Push into eventBatch
+    eventBatch.push(event);
+    sessionStats.eventsCollected++;
+    updateBadge();
 
-      eventBatch.push(event);
-      sessionStats.eventsCollected++;
+    // High risk notification if very high sensitivity
+    if (classification.isHighRisk && classification.sensitivity >= 0.85) {
+      chrome.notifications.create(`risk-${Date.now()}`, {
+        type: "basic",
+        iconUrl: "icons/icon128.png",
+        title: "🛡️ High-Sensitivity Domain Monitored",
+        message: `${domain} classified as high-risk (${classification.category.replace(/_/g, " ")}). Privacy minimization active.`,
+        priority: 1,
+      });
+    }
 
-      // Update badge
-      updateBadge();
-
-      // Auto-flush if batch is full
-      if (eventBatch.length >= MAX_BATCH_SIZE) {
+    // Auto-flush to backend server if apiToken is available and batch is ready
+    if (data.apiToken) {
+      if (eventBatch.length >= 3 || classification.isHighRisk) {
         flushBatch(data.apiToken, data.apiUrl);
       }
-    } catch (e) {
-      console.error("PrivacyX: Error processing tab update", e);
     }
+  });
+}
+
+// Tab Update Handler
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" || (changeInfo.url && !changeInfo.url.startsWith("chrome://"))) {
+    processTabNavigation(tab, "updated");
+  }
+});
+
+// Tab Activated Handler (when user switches tabs)
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    if (chrome.runtime.lastError || !tab) return;
+    processTabNavigation(tab, "activated");
   });
 });
 
@@ -301,10 +454,23 @@ chrome.webRequest.onBeforeRequest.addListener(
       const url = new URL(details.url);
       const domain = url.hostname;
 
-      // Block known trackers (when shield mode is active)
-      chrome.storage.local.get(["shieldMode"], (data) => {
-        if (data.shieldMode === "active" && isTrackerDomain(domain)) {
+      // Skip localhost
+      if (domain === "localhost" || domain === "127.0.0.1") return;
+
+      chrome.storage.local.get(["shieldMode", "monitoring"], (data) => {
+        if (data.monitoring?.paused) return;
+
+        // Tracker Detection
+        if (isTrackerDomain(domain)) {
           sessionStats.trackersBlocked++;
+          recordLeak("tracker", domain, "medium", data.shieldMode === "active");
+          updateBadge();
+        }
+
+        // Data Broker Detection
+        if (isDataBroker(domain)) {
+          sessionStats.leaksBlocked++;
+          recordLeak("data_broker", domain, "critical", true);
           updateBadge();
         }
       });
@@ -316,6 +482,7 @@ chrome.webRequest.onBeforeRequest.addListener(
         for (const finding of piiFindings) {
           recordLeak("pii_in_request", domain, finding.severity, false, finding);
         }
+        updateBadge();
       }
     } catch (e) {
       // Ignore malformed URLs
@@ -329,13 +496,15 @@ chrome.webRequest.onBeforeRequest.addListener(
 // Leak Recording
 // =========================================================================
 function recordLeak(type, domain, severity, blocked, piiDetail = null) {
+  const now = new Date().toISOString();
   const leak = {
     type,
     domain,
     severity,
     blocked,
     piiDetail,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
+    createdAt: now,
   };
   leakBatch.push(leak);
 
@@ -467,14 +636,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "getStats") {
-    chrome.storage.local.get(["totalEvents", "leakHistory"], (data) => {
+    chrome.storage.local.get(["totalEvents", "leakHistory", "recentEvents"], (data) => {
       sendResponse({
         sessionStats,
         totalEvents: data.totalEvents || 0,
         leakCount: (data.leakHistory || []).length,
         recentLeaks: (data.leakHistory || []).slice(0, 10),
+        recentEvents: (data.recentEvents || []).slice(0, 20),
         queuedEvents: eventBatch.length,
       });
+    });
+    return true;
+  }
+
+  if (request.action === "clearRecentEvents") {
+    chrome.storage.local.set({ recentEvents: [] }, () => {
+      sendResponse({ success: true });
     });
     return true;
   }
@@ -507,6 +684,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     
     sendResponse({ acknowledged: true });
+    return true;
+  }
+
+  if (request.action === "autoConnect") {
+    chrome.storage.local.get(["apiUrl"], async (data) => {
+      const baseUrl = data.apiUrl || "http://localhost:3000";
+      try {
+        const res = await fetch(`${baseUrl}/api/user/token`, { credentials: "include" });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.token) {
+            chrome.storage.local.set({ apiToken: json.token }, () => {
+              sendResponse({ success: true, token: json.token });
+            });
+            return;
+          }
+        }
+        sendResponse({ success: false, error: "Not logged in to PrivacyX" });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message || "Failed to reach server" });
+      }
+    });
     return true;
   }
 });

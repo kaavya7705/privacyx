@@ -411,6 +411,7 @@ function applyNoise(events: IEvent[]): Partial<IEvent>[] {
       hourOfDay: randomHour,
       dayOfWeek: noiseDate.getDay(),
       sensitivity: 0,
+      metadata: { defenseNoise: true },
       createdAt: noiseDate,
     });
   }
@@ -447,6 +448,7 @@ function applyKAnonymity(events: IEvent[]): Partial<IEvent>[] {
           hourOfDay: parseInt(bucket.split(":")[0]),
           dayOfWeek: synthDate.getDay(),
           sensitivity: 0,
+          metadata: { defenseNoise: true },
           createdAt: synthDate,
         });
       }

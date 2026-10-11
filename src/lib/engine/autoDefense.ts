@@ -61,26 +61,27 @@ export function evaluateAutoDefense(
 
   const rationale: string[] = [];
   const candidateStrategies: string[] = [];
+  const attackType = (topAttack.type || "").toLowerCase();
 
   // Determine candidate strategies based on top attacks
-  if (topAttack.type.includes("home") || topAttack.type.includes("work") || topAttack.type.includes("location")) {
+  if (attackType.includes("home") || attackType.includes("work") || attackType.includes("location")) {
     candidateStrategies.push("location_generalization");
     rationale.push(`Critical location exposure detected (${topAttack.type}: ${Math.round(topAttack.risk)}% risk). Location generalization applied.`);
   }
 
-  if (topAttack.type.includes("routine") || topAttack.type.includes("temporal") || topAttack.type.includes("anomaly")) {
+  if (attackType.includes("routine") || attackType.includes("temporal") || attackType.includes("anomaly")) {
     candidateStrategies.push("timestamp_bucketing");
     candidateStrategies.push("k_anonymity");
     rationale.push(`Temporal activity profiling detected (${topAttack.type}: ${Math.round(topAttack.risk)}% risk). Rounding timestamps & k-anonymity applied.`);
   }
 
-  if (topAttack.type.includes("interest") || topAttack.type.includes("fingerprint")) {
+  if (attackType.includes("interest") || attackType.includes("fingerprint")) {
     candidateStrategies.push("suppression");
     candidateStrategies.push("aggregation");
     rationale.push(`Behavioral fingerprinting detected (${topAttack.type}: ${Math.round(topAttack.risk)}% risk). Rare category suppression activated.`);
   }
 
-  if (topAttack.type.includes("re_id") || topAttack.type.includes("cross_source")) {
+  if (attackType.includes("reident") || attackType.includes("re_id") || attackType.includes("cross_source")) {
     candidateStrategies.push("differential_privacy");
     candidateStrategies.push("noise");
     rationale.push(`Cross-source re-identification detected (${topAttack.type}: ${Math.round(topAttack.risk)}% risk). Differential privacy noise calibrated.`);

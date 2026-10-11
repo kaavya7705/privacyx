@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import {
   Brain, AlertTriangle, Eye, Shield, Database, Clock, Globe,
   Home, Briefcase, Repeat, Target, Fingerprint, Link2, Activity,
@@ -411,7 +413,7 @@ export default function InferencesPage() {
               <Brain className="w-12 h-12 text-px-text-muted mx-auto mb-4 opacity-30" />
               <p className="text-px-text-muted text-sm mb-2">No inferences yet.</p>
               <p className="text-xs text-px-text-muted">
-                Go to the <a href="/attack" className="text-px-cyan underline">Attack page</a> and run a privacy attack first.
+                Go to the <Link href="/attack" className="text-px-cyan underline">Attack page</Link> and run a privacy attack first.
                 Then come back here to see what could be learned about you.
               </p>
             </div>
@@ -512,9 +514,9 @@ export default function InferencesPage() {
                             <div className="p-3 rounded-lg bg-px-emerald/5 border border-px-emerald/20">
                               <div className="text-[11px] uppercase tracking-wider text-px-emerald font-bold mb-1">🛡️ What You Can Do</div>
                               <p className="text-xs text-px-text-secondary">{meta?.whatYouCanDo}</p>
-                              <a href="/defense" className="inline-flex items-center gap-1 text-xs text-px-cyan mt-2 hover:underline">
+                              <Link href="/defense" className="inline-flex items-center gap-1 text-xs text-px-cyan mt-2 hover:underline">
                                 <Shield className="w-3 h-3" /> Go to Defense Engine →
-                              </a>
+                              </Link>
                             </div>
 
                             {/* Disclaimer */}

@@ -22,7 +22,6 @@ import {
   runMLRoutineDetection,
   runMLReidentification,
 } from "@/lib/ml-client";
-import { generateSyntheticData } from "@/lib/engine/synthetic";
 import type { AdversaryProfile } from "@/lib/engine/attacks/types";
 import type { IEvent } from "@/lib/models/Event";
 import type { MLRiskInput } from "@/lib/engine/risk";
@@ -74,45 +73,6 @@ export async function POST(req: Request) {
       .limit(1000)
       .lean();
 
-    if (events.length === 0) {
-      const starter = generateSyntheticData("student", 7, 12);
-      let docs = starter.events.map((e) => ({
-        ...e,
-        userId: session.userId,
-      }));
-
-      // If active defense is enabled, apply defense to starter docs
-      if (activeDefense?.selectedStrategy && activeDefense.selectedStrategy !== "none") {
-        try {
-          const defResult = applyDefense(
-            docs as unknown as IEvent[],
-            activeDefense.selectedStrategy,
-            75,
-            attackProfile as AdversaryProfile
-          );
-          docs = defResult.transformedEvents.map((e) => {
-            const plain = (e && typeof (e as { toObject?: () => Record<string, unknown> }).toObject === "function")
-              ? (e as { toObject: () => Record<string, unknown> }).toObject()
-              : { ...(e as unknown as Record<string, unknown>) };
-            delete plain._id;
-            delete plain.__v;
-            return {
-              ...plain,
-              userId: session.userId,
-              createdAt: plain.createdAt ? new Date(plain.createdAt as string | number | Date) : new Date(),
-            };
-          });
-        } catch (e) {
-          console.warn("Failed to apply defense to starter events:", e);
-        }
-      }
-
-      await Event.insertMany(docs);
-      events = await Event.find({ userId: session.userId })
-        .sort({ createdAt: -1 })
-        .limit(1000)
-        .lean();
-    }
 
     // 1. Run heuristic feature extraction + attack battery
     const features = extractFeatures(events as unknown as IEvent[]);
@@ -177,10 +137,10 @@ export async function POST(req: Request) {
             modelsLoaded: mlHealth.models_loaded ?? 0,
           };
 
-          // Enrich attack battery with ML-powered anomaly exploitation
+          // Enrich attack battery with ML-powered anomaly exploitation in-place
           if (anomalies && anomalies.anomaly_count > 0) {
-            attackResults.attacks.push({
-              type: "ANOMALY_EXPLOITATION",
+            const mlAnomalyAttack = {
+              type: "ANOMALY_EXPLOITATION" as const,
               adversaryProfile: attackProfile as AdversaryProfile,
               confidence: Math.min(0.95, anomalies.anomaly_percentage / 100 + 0.3),
               risk: Math.min(95, Math.round(anomalies.anomaly_percentage * 5 + 35)),
@@ -202,7 +162,14 @@ export async function POST(req: Request) {
                 totalAnomalies: anomalies.anomaly_count,
                 mlMethod: mlRisk?.method || "unknown",
               },
-            });
+            };
+
+            const existingIdx = attackResults.attacks.findIndex((a) => a.type === "ANOMALY_EXPLOITATION");
+            if (existingIdx >= 0) {
+              attackResults.attacks[existingIdx] = mlAnomalyAttack;
+            } else {
+              attackResults.attacks.push(mlAnomalyAttack);
+            }
           }
 
           // Save ML prediction in MongoDB

@@ -6,7 +6,6 @@ import { RiskSnapshot } from "@/lib/models/RiskSnapshot";
 import { getSession } from "@/lib/auth";
 import { evaluateAutoDefense } from "@/lib/engine/autoDefense";
 import { applyDefense } from "@/lib/engine/defenses";
-import { generateSyntheticData } from "@/lib/engine/synthetic";
 import { checkMLHealth, eventsToFeatureVectors, runMLDefensePrediction } from "@/lib/ml-client";
 import type { IEvent } from "@/lib/models/Event";
 
@@ -21,17 +20,7 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(1000);
 
-    if (events.length === 0) {
-      const starter = generateSyntheticData("student", 7, 12);
-      const docs = starter.events.map((e) => ({
-        ...e,
-        userId: session.userId,
-      }));
-      await Event.insertMany(docs);
-      events = await Event.find({ userId: session.userId })
-        .sort({ createdAt: -1 })
-        .limit(1000);
-    }
+
 
     const recommendation = evaluateAutoDefense(events as unknown as IEvent[]);
 
@@ -66,17 +55,7 @@ export async function POST(req: Request) {
       .sort({ createdAt: -1 })
       .limit(1000);
 
-    if (events.length === 0) {
-      const starter = generateSyntheticData("student", 7, 12);
-      const docs = starter.events.map((e) => ({
-        ...e,
-        userId: session.userId,
-      }));
-      await Event.insertMany(docs);
-      events = await Event.find({ userId: session.userId })
-        .sort({ createdAt: -1 })
-        .limit(1000);
-    }
+
 
     const lastSnapshot = (await RiskSnapshot.findOne({ userId: session.userId })
       .sort({ createdAt: -1 })

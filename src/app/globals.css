@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
 :root {
   --px-bg: #0a0e1a;
   --px-bg-secondary: #0f1629;
@@ -26,7 +24,7 @@
 }
 
 html {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
   scroll-behavior: smooth;
 }
 
@@ -44,7 +42,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--px-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--px-cyan); }
 
-/* Glass Card */
+/* Components */
 @layer components {
   .glass-card {
     @apply relative overflow-hidden rounded-xl border border-px-border bg-px-surface/50 backdrop-blur-xl;
@@ -52,7 +50,8 @@ body {
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300;
+    @apply relative overflow-hidden rounded-xl border border-px-border bg-px-surface/50 backdrop-blur-xl transition-all duration-300;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
   .glass-card-hover:hover {
     @apply border-px-cyan/30;
@@ -97,6 +96,16 @@ body {
            text-px-emerald hover:border-px-emerald hover:bg-px-emerald/20
            transition-all duration-300 cursor-pointer;
   }
+  .btn-success:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3), 0 0 60px rgba(0, 255, 136, 0.1);
+  }
+
+  .btn-secondary {
+    @apply relative px-6 py-3 rounded-lg font-medium text-sm
+           bg-px-surface/60 border border-px-border
+           text-px-text-secondary hover:text-px-text hover:border-px-border-light hover:bg-px-surface
+           transition-all duration-300 cursor-pointer;
+  }
 
   .risk-badge-low { @apply bg-risk-low/15 text-risk-low border border-risk-low/30 px-3 py-1 rounded-full text-xs font-bold uppercase; }
   .risk-badge-medium { @apply bg-risk-medium/15 text-risk-medium border border-risk-medium/30 px-3 py-1 rounded-full text-xs font-bold uppercase; }
@@ -119,7 +128,7 @@ body {
   }
 }
 
-/* Scan line animation */
+/* Animations & utilities */
 .scan-line::after {
   content: '';
   position: absolute;
@@ -131,7 +140,6 @@ body {
   animation: scan-line 3s linear infinite;
 }
 
-/* Pulse dot */
 .pulse-dot {
   width: 8px;
   height: 8px;
@@ -141,7 +149,6 @@ body {
   box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
 }
 
-/* Grid background */
 .grid-bg {
   background-image:
     linear-gradient(rgba(36, 48, 86, 0.3) 1px, transparent 1px),
@@ -149,7 +156,85 @@ body {
   background-size: 40px 40px;
 }
 
-/* Gradient overlay */
 .gradient-overlay {
   background: radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%);
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
+  50% { transform: scale(1.2); opacity: 0.7; box-shadow: 0 0 20px rgba(0, 255, 136, 0.9); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(36, 48, 86, 0.6);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.4);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+  25% { transform: translateY(-20px) rotate(5deg); opacity: 1; }
+  50% { transform: translateY(-10px) rotate(-3deg); opacity: 0.8; }
+  75% { transform: translateY(-25px) rotate(2deg); opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(26, 35, 66, 0.5) 25%,
+    rgba(0, 240, 255, 0.08) 50%,
+    rgba(26, 35, 66, 0.5) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(0, 240, 255, 0.25);
+  color: #e2e8f0;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(0, 240, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tooltip-card {
+  background: #151d35;
+  border: 1px solid #243056;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #e2e8f0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
 }

@@ -1,5 +1,4 @@
-import DashboardLayout from "@/app/dashboard/layout";
-
+import DashboardShell from "@/app/components/DashboardShell";
 export default function AttackLayout({ children }: { children: React.ReactNode }) {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <DashboardShell>{children}</DashboardShell>;
 }

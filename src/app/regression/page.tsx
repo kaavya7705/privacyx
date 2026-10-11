@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { GitCompare, AlertTriangle, TrendingUp, ArrowRight, Database } from "lucide-react";
+import { GitCompare, AlertTriangle, TrendingUp, ArrowRight, Database, Sparkles } from "lucide-react";
+import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 
 interface RegressionResult {
   baselineRisks: Record<string, number>;
@@ -163,15 +164,21 @@ export default function RegressionPage() {
 
           {/* Cause Analysis */}
           {result.regressions.filter((r) => r.cause).length > 0 && (
-            <div className="glass-card p-6">
-              <h2 className="font-bold mb-4">Regression Causes</h2>
-              <div className="space-y-2">
+            <div className="glass-card p-6 space-y-3">
+              <h2 className="font-bold text-sm text-white uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-px-amber" />
+                Root Cause Analysis
+              </h2>
+              <div className="space-y-2.5">
                 {result.regressions.filter((r) => r.cause).map((r) => (
-                  <div key={r.category} className="flex items-start gap-2 text-sm">
-                    <AlertTriangle className="w-4 h-4 text-px-amber mt-0.5 flex-shrink-0" />
-                    <span className="text-px-text-secondary">
-                      <span className="text-px-text font-medium capitalize">{r.category}</span>: {r.cause}
-                    </span>
+                  <div key={r.category} className="p-3 rounded-lg border border-px-border bg-px-surface/40 flex items-start gap-3">
+                    <AlertTriangle className="w-4 h-4 text-px-amber mt-1 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-white capitalize mb-1">
+                        {r.category.replace(/_/g, " ")} Vector Exposure
+                      </div>
+                      <MarkdownRenderer content={r.cause || ""} />
+                    </div>
                   </div>
                 ))}
               </div>
